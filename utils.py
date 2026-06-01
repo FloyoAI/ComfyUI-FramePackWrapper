@@ -14,6 +14,9 @@ def check_diffusers_version():
         raise AssertionError("diffusers is not installed.")
 
 def print_memory(device):
+    if not torch.cuda.is_available():
+        log.info("CUDA not available; skipping GPU memory stats")
+        return
     memory = torch.cuda.memory_allocated(device) / 1024**3
     max_memory = torch.cuda.max_memory_allocated(device) / 1024**3
     max_reserved = torch.cuda.max_memory_reserved(device) / 1024**3

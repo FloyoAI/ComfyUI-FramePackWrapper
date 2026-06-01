@@ -5,8 +5,23 @@ import torch
 
 
 cpu = torch.device('cpu')
-gpu = torch.device(f'cuda:{torch.cuda.current_device()}')
+
+
+def cuda_available():
+    return torch.cuda.is_available()
+
+
+if cuda_available():
+    gpu = torch.device(f'cuda:{torch.cuda.current_device()}')
+else:
+    gpu = cpu
+
 gpu_complete_modules = []
+
+
+def empty_cuda_cache():
+    if cuda_available():
+        torch.cuda.empty_cache()
 
 
 class DynamicSwapInstaller:
@@ -69,6 +84,9 @@ def fake_diffusers_current_device(model: torch.nn.Module, target_device: torch.d
 
 
 def get_cuda_free_memory_gb(device=None):
+    if not cuda_available():
+        return float('inf')
+
     if device is None:
         device = gpu
 
@@ -85,15 +103,15 @@ def move_model_to_device_with_memory_preservation(model, target_device, preserve
     print(f'Moving {model.__class__.__name__} to {target_device} with preserved memory: {preserved_memory_gb} GB')
 
     for m in model.modules():
-        if get_cuda_free_memory_gb(target_device) <= preserved_memory_gb:
-            torch.cuda.empty_cache()
+        if cuda_available() and get_cuda_free_memory_gb(target_device) <= preserved_memory_gb:
+            empty_cuda_cache()
             return
 
         if hasattr(m, 'weight'):
             m.to(device=target_device)
 
     model.to(device=target_device)
-    torch.cuda.empty_cache()
+    empty_cuda_cache()
     return
 
 
@@ -101,15 +119,15 @@ def offload_model_from_device_for_memory_preservation(model, target_device, pres
     print(f'Offloading {model.__class__.__name__} from {target_device} to preserve memory: {preserved_memory_gb} GB')
 
     for m in model.modules():
-        if get_cuda_free_memory_gb(target_device) >= preserved_memory_gb:
-            torch.cuda.empty_cache()
+        if cuda_available() and get_cuda_free_memory_gb(target_device) >= preserved_memory_gb:
+            empty_cuda_cache()
             return
 
         if hasattr(m, 'weight'):
             m.to(device=cpu)
 
     model.to(device=cpu)
-    torch.cuda.empty_cache()
+    empty_cuda_cache()
     return
 
 
@@ -119,7 +137,7 @@ def unload_complete_models(*args):
         print(f'Unloaded {m.__class__.__name__} as complete.')
 
     gpu_complete_modules.clear()
-    torch.cuda.empty_cache()
+    empty_cuda_cache()
     return
 
 

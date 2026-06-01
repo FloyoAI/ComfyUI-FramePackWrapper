@@ -318,6 +318,9 @@ def add_tensors_with_padding(tensor1, tensor2):
 
 
 def print_free_mem():
+    if not torch.cuda.is_available():
+        print("CUDA not available; skipping GPU memory stats")
+        return
     torch.cuda.empty_cache()
     free_mem, total_mem = torch.cuda.mem_get_info(0)
     free_mem_mb = free_mem / (1024 ** 2)
